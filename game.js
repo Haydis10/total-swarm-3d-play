@@ -1,4 +1,4 @@
-import * as THREE from "https://unpkg.com/three@0.166.1/build/three.module.js";
+import * as THREE from "./lib/three.module.js";
 
 const canvas = document.getElementById("game");
 
@@ -13,6 +13,7 @@ const endTitle = document.getElementById("endTitle");
 const endSummary = document.getElementById("endSummary");
 
 const laneXs = [-8.5, 0, 8.5];
+const roadHalfWidth = 11;
 const playerZ = 24;
 const chosenLevel = Math.max(1, Math.min(100, Number(new URLSearchParams(window.location.search).get("level")) || 1));
 
@@ -30,9 +31,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#1c2f47");
 scene.fog = new THREE.Fog("#1a2433", 52, 180);
 
-const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 300);
-camera.position.set(0, 16, 52);
-camera.lookAt(0, 8, -8);
+const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
+camera.position.set(0, 28, 34);
+camera.lookAt(0, 0, 4);
 
 const hemiLight = new THREE.HemisphereLight("#c8ecff", "#30405a", 2.2);
 scene.add(hemiLight);
@@ -59,6 +60,7 @@ const sceneObjects = {
   sidewalks: [],
   buildings: [],
   props: [],
+  scrollers: [],
   bullets: [],
   enemies: [],
   pickups: [],
@@ -80,7 +82,7 @@ const state = {
   maxUnits: 1,
   fireRate: 3.2,
   weaponTier: 0,
-  targetLane: 1,
+  targetX: laneXs[1],
   playerX: laneXs[1],
   roadScroll: 0,
   walkTime: 0,
@@ -157,7 +159,7 @@ function resetState(level = chosenLevel) {
   state.maxUnits = state.units;
   state.fireRate = profile.startingFireRate;
   state.weaponTier = 0;
-  state.targetLane = 1;
+  state.targetX = laneXs[1];
   state.playerX = laneXs[1];
   state.roadScroll = 0;
   state.walkTime = 0;
@@ -214,16 +216,30 @@ function createStreet() {
     marker.receiveShadow = true;
     scene.add(marker);
     sceneObjects.laneMarkers.push(marker);
+    sceneObjects.scrollers.push({
+      mesh: marker,
+      speed: 24,
+      resetSpan: 224,
+      resetThreshold: 36,
+    });
   }
 
   const sideMaterial = new THREE.MeshStandardMaterial({ color: "#526171", roughness: 0.95 });
-  const sidewalkGeometry = new THREE.BoxGeometry(8, 0.7, 220);
+  const sidewalkGeometry = new THREE.BoxGeometry(8, 0.7, 24);
   for (const x of [-19, 19]) {
-    const sidewalk = new THREE.Mesh(sidewalkGeometry, sideMaterial);
-    sidewalk.position.set(x, 0.35, -34);
-    sidewalk.receiveShadow = true;
-    scene.add(sidewalk);
-    sceneObjects.sidewalks.push(sidewalk);
+    for (let i = 0; i < 10; i += 1) {
+      const sidewalk = new THREE.Mesh(sidewalkGeometry, sideMaterial);
+      sidewalk.position.set(x, 0.35, 28 - i * 24);
+      sidewalk.receiveShadow = true;
+      scene.add(sidewalk);
+      sceneObjects.sidewalks.push(sidewalk);
+      sceneObjects.scrollers.push({
+        mesh: sidewalk,
+        speed: 24,
+        resetSpan: 240,
+        resetThreshold: 40,
+      });
+    }
   }
 
   for (let i = 0; i < 16; i += 1) {
@@ -242,6 +258,12 @@ function createStreet() {
     building.receiveShadow = true;
     scene.add(building);
     sceneObjects.buildings.push(building);
+    sceneObjects.scrollers.push({
+      mesh: building,
+      speed: 22,
+      resetSpan: 224,
+      resetThreshold: 46,
+    });
   }
 
   const lampPole = new THREE.CylinderGeometry(0.18, 0.18, 8);
@@ -259,7 +281,14 @@ function createStreet() {
     const glow = new THREE.PointLight("#ffd889", 4, 22, 2);
     glow.position.set(0, 3.5, 0);
     pole.add(glow);
+    scene.add(pole);
     sceneObjects.props.push(pole);
+    sceneObjects.scrollers.push({
+      mesh: pole,
+      speed: 24,
+      resetSpan: 176,
+      resetThreshold: 42,
+    });
   }
 }
 
@@ -557,18 +586,17 @@ function syncHud() {
 
 function updateRoad(dt) {
   state.roadScroll += dt * (8 + profile.danger * 7);
-  for (let i = 0; i < sceneObjects.laneMarkers.length; i += 1) {
-    const marker = sceneObjects.laneMarkers[i];
-    marker.position.z += dt * (24 + profile.danger * 18);
-    if (marker.position.z > 36) {
-      marker.position.z -= sceneObjects.laneMarkers.length * 16;
+  for (const scroller of sceneObjects.scrollers) {
+    scroller.mesh.position.z += dt * (scroller.speed + profile.danger * 16);
+    if (scroller.mesh.position.z > scroller.resetThreshold) {
+      scroller.mesh.position.z -= scroller.resetSpan;
     }
   }
 }
 
 function animatePlayer(dt) {
-  state.walkTime += dt * (6 + profile.danger * 3);
-  state.playerX += (laneXs[state.targetLane] - state.playerX) * Math.min(1, dt * 10);
+  state.walkTime += dt * (5.4 + profile.danger * 3);
+  state.playerX += (state.targetX - state.playerX) * Math.min(1, dt * 14);
 
   for (let i = 0; i < sceneObjects.playerUnits.length; i += 1) {
     const unit = sceneObjects.playerUnits[i];
@@ -579,7 +607,7 @@ function animatePlayer(dt) {
     unit.position.x += ((state.playerX + offsetX) - unit.position.x) * Math.min(1, dt * 10);
     unit.position.z = playerZ + offsetZ;
     unit.position.y = Math.abs(Math.sin(state.walkTime + i * 0.8)) * 0.18;
-    unit.rotation.y = Math.sin((state.playerX - laneXs[1]) * 0.07) * 0.18;
+    unit.rotation.y = (state.playerX / roadHalfWidth) * 0.22;
   }
 }
 
@@ -666,7 +694,7 @@ function updateBoss(dt) {
   }
 
   const boss = state.boss;
-  const desiredX = laneXs[Math.max(0, Math.min(laneXs.length - 1, state.targetLane))] * 0.6;
+  const desiredX = state.targetX * 0.6;
   boss.mesh.position.x += (desiredX - boss.mesh.position.x) * Math.min(1, dt * 1.8);
   boss.z += boss.speed * dt;
   boss.mesh.position.z = boss.z;
@@ -829,28 +857,49 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-function setTargetLaneFromClientX(clientX) {
+function setTargetXFromClientX(clientX) {
   const rect = canvas.getBoundingClientRect();
   const relativeX = clientX - rect.left;
-  const lane = Math.max(0, Math.min(laneXs.length - 1, Math.floor((relativeX / rect.width) * laneXs.length)));
-  state.targetLane = lane;
+  const normalized = Math.max(0, Math.min(1, relativeX / rect.width));
+  state.targetX = THREE.MathUtils.lerp(-roadHalfWidth, roadHalfWidth, normalized);
 }
+
+let activePointerId = null;
 
 canvas.addEventListener("pointerdown", (event) => {
   if (!state.running) {
     return;
   }
-  setTargetLaneFromClientX(event.clientX);
+  activePointerId = event.pointerId;
+  canvas.setPointerCapture(event.pointerId);
+  event.preventDefault();
+  setTargetXFromClientX(event.clientX);
 });
 
 canvas.addEventListener("pointermove", (event) => {
   if (!state.running) {
     return;
   }
-  if (event.pointerType === "mouse" && event.buttons === 0) {
+  if (event.pointerId !== activePointerId) {
     return;
   }
-  setTargetLaneFromClientX(event.clientX);
+  if (event.pointerType === "mouse" && (event.buttons & 1) === 0) {
+    return;
+  }
+  event.preventDefault();
+  setTargetXFromClientX(event.clientX);
+});
+
+canvas.addEventListener("pointerup", (event) => {
+  if (event.pointerId === activePointerId) {
+    activePointerId = null;
+  }
+});
+
+canvas.addEventListener("pointercancel", (event) => {
+  if (event.pointerId === activePointerId) {
+    activePointerId = null;
+  }
 });
 
 document.getElementById("startButton").addEventListener("click", () => {

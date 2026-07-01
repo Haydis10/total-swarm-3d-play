@@ -87,6 +87,10 @@ canvas {
   height: 100%;
   display: block;
   background: linear-gradient(180deg, #233a56 0%, #0c1523 100%);
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
 }
 
 .overlay {

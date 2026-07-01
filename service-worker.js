@@ -1,4 +1,4 @@
-const CACHE_NAME = "total-swarm-3d-v1";
+const CACHE_NAME = "total-swarm-3d-v2";
 const APP_FILES = [
   "./",
   "./index.html",
