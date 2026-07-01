@@ -31,9 +31,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#1c2f47");
 scene.fog = new THREE.Fog("#1a2433", 52, 180);
 
-const camera = new THREE.PerspectiveCamera(54, 1, 0.1, 300);
-camera.position.set(0, 38, 30);
-camera.lookAt(0, 0, 2);
+const camera = new THREE.PerspectiveCamera(58, 1, 0.1, 300);
+camera.position.set(0, 16, 40);
+camera.lookAt(0, 3, -18);
 
 const hemiLight = new THREE.HemisphereLight("#c8ecff", "#30405a", 2.2);
 scene.add(hemiLight);
@@ -898,6 +898,18 @@ function animatePlayer(dt) {
     unit.position.y = Math.abs(Math.sin(state.walkTime + i * 0.8)) * 0.18;
     unit.rotation.y = (state.playerX / roadHalfWidth) * 0.22;
   }
+
+  const desiredCameraX = state.playerX * 0.42;
+  camera.position.x += (desiredCameraX - camera.position.x) * Math.min(1, dt * 4.5);
+  camera.position.y += (16.5 - camera.position.y) * Math.min(1, dt * 2.8);
+  camera.position.z += (41 - camera.position.z) * Math.min(1, dt * 2.8);
+
+  const lookTarget = new THREE.Vector3(
+    state.playerX * 0.3,
+    3.2,
+    -22
+  );
+  camera.lookAt(lookTarget);
 }
 
 function updateCombat(dt) {
