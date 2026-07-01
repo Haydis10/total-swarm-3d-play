@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260701j">
+  <link rel="stylesheet" href="./styles.css?v=20260701k">
 </head>
 <body>
   <main class="shell">
@@ -44,7 +44,7 @@
           <h1>Total Swarm</h1>
           <p class="copy">
             Switch across two lanes, clear enemy waves on one side, and decide whether the
-            opposite lane's big weapon target is worth the risk.
+            opposite lane's big weapon target and charge-up bubble are worth the risk.
           </p>
           <button id="startButton">Start Run</button>
         </div>
@@ -62,16 +62,16 @@
 
     <section class="tips">
       <p>Drag sideways between two lanes to choose the safe lane and the reward lane.</p>
-      <p>Touch the glowing +1 bubbles to add one shooter to your squad.</p>
+      <p>Some bubbles count upward as you shoot them. Collect them to claim that many shooters.</p>
       <p>Enemy waves arrive in beats. The big blue weapon target sits on the opposite lane.</p>
     </section>
   </main>
 
-  <script type="module" src="./game.js?v=20260701j"></script>
+  <script type="module" src="./game.js?v=20260701k"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=20260701j").catch(() => {});
+        navigator.serviceWorker.register("./service-worker.js?v=20260701k").catch(() => {});
       });
     }
   </script>

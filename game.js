@@ -65,6 +65,7 @@ const sceneObjects = {
   enemies: [],
   pickups: [],
   upgradeTargets: [],
+  countBubbles: [],
   muzzleFlashes: [],
   particles: [],
   gates: [],
@@ -83,8 +84,9 @@ const state = {
   maxUnits: 1,
   fireRate: 3.2,
   weaponTier: 0,
-  targetX: 0,
-  playerX: 0,
+  shotCount: 1,
+  targetX: laneXs[0],
+  playerX: laneXs[0],
   roadScroll: 0,
   walkTime: 0,
   clusterTimer: 0,
@@ -107,26 +109,47 @@ function getLevelProfile(level) {
   return {
     danger,
     startingUnits: 1,
-    startingFireRate: 2.2 + danger * 0.55,
+    startingFireRate: 2 + danger * 0.9,
     encountersPerLevel: 4 + Math.floor(danger * 2),
     combatDuration: Math.max(12, 14 - danger * 1.5),
-    clusterInterval: Math.max(1.1, 2.3 - danger * 0.65),
+    clusterInterval: Math.max(2.4, 4.3 - danger * 0.9),
     clustersPerEncounter: 3 + Math.floor(danger * 2),
     roadSpeed: 4 + danger * 3.2,
     enemySpeed: 2.3 + danger * 5,
-    enemyHp: Math.max(1, Math.round(1 + level * 0.025 + danger * 5)),
+    enemyHp: Math.max(1, Math.round(1 + level * 0.02 + danger * 4)),
     enemyDamage: Math.max(1, Math.round(1 + danger * 5)),
     bossHp: Math.round(14 + level * 2.5 + danger * 110),
     bossSpeed: 1.8 + danger * 3.4,
     bossAttackInterval: Math.max(0.7, 2.4 - danger * 1.05),
-    upgradeTargetHp: Math.round(3 + level * 0.14 + danger * 6),
-    bonusBubbleChance: 0.45,
+    upgradeTargetHp: Math.round(3 + level * 0.12 + danger * 5),
+    bonusBubbleChance: 0.7,
     upgradeTargetChance: 1,
   };
 }
 
 let profile = getLevelProfile(state.level);
 let levelScript = null;
+
+const AUTHORED_WAVE_FAMILIES = {
+  easy: [
+    { enemyLane: 0, enemyCount: 10, rowSpacing: 1.35, baseZ: -12, upgradeLane: 1, upgradeKind: "rate", upgradeValue: 0.22, bubbleCap: 4, gapAfter: 3.8 },
+    { enemyLane: 1, enemyCount: 11, rowSpacing: 1.3, baseZ: -12, upgradeLane: 0, upgradeKind: "shots", upgradeValue: 1, bubbleCap: 5, gapAfter: 4.2 },
+    { enemyLane: 0, enemyCount: 12, rowSpacing: 1.25, baseZ: -13, upgradeLane: 1, upgradeKind: "rate", upgradeValue: 0.26, bubbleCap: 6, gapAfter: 4.4 },
+    { enemyLane: 1, enemyCount: 13, rowSpacing: 1.22, baseZ: -13, upgradeLane: 0, upgradeKind: "shots", upgradeValue: 1, bubbleCap: 7, gapAfter: 4.6 },
+  ],
+  medium: [
+    { enemyLane: 0, enemyCount: 12, rowSpacing: 1.18, baseZ: -13, upgradeLane: 1, upgradeKind: "rate", upgradeValue: 0.24, bubbleCap: 6, gapAfter: 3.6 },
+    { enemyLane: 1, enemyCount: 13, rowSpacing: 1.14, baseZ: -13, upgradeLane: 0, upgradeKind: "shots", upgradeValue: 1, bubbleCap: 7, gapAfter: 3.8 },
+    { enemyLane: 0, enemyCount: 14, rowSpacing: 1.1, baseZ: -14, upgradeLane: 1, upgradeKind: "both", upgradeValue: 1, bubbleCap: 8, gapAfter: 4.0 },
+    { enemyLane: 1, enemyCount: 15, rowSpacing: 1.06, baseZ: -14, upgradeLane: 0, upgradeKind: "rate", upgradeValue: 0.28, bubbleCap: 8, gapAfter: 4.2 },
+  ],
+  hard: [
+    { enemyLane: 0, enemyCount: 14, rowSpacing: 1.04, baseZ: -14, upgradeLane: 1, upgradeKind: "rate", upgradeValue: 0.24, bubbleCap: 8, gapAfter: 3.2 },
+    { enemyLane: 1, enemyCount: 15, rowSpacing: 1.0, baseZ: -14, upgradeLane: 0, upgradeKind: "shots", upgradeValue: 1, bubbleCap: 9, gapAfter: 3.4 },
+    { enemyLane: 0, enemyCount: 15, rowSpacing: 0.98, baseZ: -15, upgradeLane: 1, upgradeKind: "both", upgradeValue: 1, bubbleCap: 10, gapAfter: 3.6 },
+    { enemyLane: 1, enemyCount: 16, rowSpacing: 0.95, baseZ: -15, upgradeLane: 0, upgradeKind: "rate", upgradeValue: 0.32, bubbleCap: 10, gapAfter: 3.8 },
+  ],
+};
 
 const palette = {
   squad: new THREE.Color("#9fe7ff"),
@@ -160,45 +183,40 @@ function createSeededRandom(seed) {
 }
 
 function buildLevelScript(level, currentProfile) {
-  const rng = createSeededRandom(level * 9973 + 17);
+  const family =
+    level <= 15 ? AUTHORED_WAVE_FAMILIES.easy :
+    level <= 60 ? AUTHORED_WAVE_FAMILIES.medium :
+    AUTHORED_WAVE_FAMILIES.hard;
   const encounters = [];
 
   for (let encounterIndex = 0; encounterIndex < currentProfile.encountersPerLevel; encounterIndex += 1) {
     const clusters = [];
     for (let clusterIndex = 0; clusterIndex < currentProfile.clustersPerEncounter; clusterIndex += 1) {
-      const clusterSize = 2 + Math.floor(rng() * (1 + Math.round(currentProfile.danger * 2)));
-      const baseZ = -16 - rng() * 5;
-      const side = rng() > 0.5 ? "left" : "right";
-      const enemyLane = side === "left" ? 0 : 1;
-      const enemyLanes = [enemyLane];
-      const upgradeLane = side === "left" ? 1 : 0;
-      const bubbleLane = upgradeLane;
-      const rowSpacing = 2.8 + rng() * 0.5;
-      const delay = currentProfile.clusterInterval * (0.95 + rng() * 0.35);
-
+      const template = family[(encounterIndex * currentProfile.clustersPerEncounter + clusterIndex) % family.length];
+      const scale = level <= 15 ? 0 : level <= 60 ? 1 : 2;
       clusters.push({
-        clusterSize,
-        baseZ,
-        side,
-        enemyLanes,
-        rowSpacing,
-        delay,
+        clusterSize: template.enemyCount + scale,
+        baseZ: template.baseZ - scale * 0.4,
+        side: template.enemyLane === 0 ? "left" : "right",
+        enemyLanes: [template.enemyLane],
+        rowSpacing: Math.max(0.88, template.rowSpacing - scale * 0.04),
+        delay: Math.max(1.9, template.gapAfter - currentProfile.danger * 0.5),
         includeUpgrade: true,
-        upgradeLane,
-        upgradeOffset: 1.4 + rng() * 0.8,
-        includeBubble: rng() < currentProfile.bonusBubbleChance,
-        bubbleLane,
-        bubbleOffset: 2.2,
+        upgradeLane: template.upgradeLane,
+        upgradeOffset: 1.5,
+        upgradeKind: template.upgradeKind,
+        upgradeValue: template.upgradeValue,
+        includeBubble: true,
+        bubbleLane: template.upgradeLane,
+        bubbleOffset: 3.4,
+        bubbleCap: template.bubbleCap + scale,
       });
     }
 
     encounters.push({ clusters });
   }
 
-  const bossMinionLanes = [];
-  for (let i = 0; i < 24; i += 1) {
-    bossMinionLanes.push(Math.floor(rng() * laneXs.length));
-  }
+  const bossMinionLanes = Array.from({ length: 24 }, (_, index) => index % laneXs.length);
 
   return { encounters, bossMinionLanes };
 }
@@ -221,8 +239,9 @@ function resetState(level = chosenLevel) {
   state.maxUnits = state.units;
   state.fireRate = profile.startingFireRate;
   state.weaponTier = 0;
-  state.targetX = 0;
-  state.playerX = 0;
+  state.shotCount = 1;
+  state.targetX = laneXs[0];
+  state.playerX = laneXs[0];
   state.roadScroll = 0;
   state.walkTime = 0;
   state.clusterTimer = 0.05;
@@ -245,6 +264,7 @@ function resetState(level = chosenLevel) {
   clearGroupEntries(sceneObjects.enemies);
   clearGroupEntries(sceneObjects.pickups);
   clearGroupEntries(sceneObjects.upgradeTargets);
+  clearGroupEntries(sceneObjects.countBubbles);
   clearGroupEntries(sceneObjects.muzzleFlashes);
   clearGroupEntries(sceneObjects.particles);
   clearGroupEntries(sceneObjects.gates);
@@ -413,6 +433,17 @@ function createPlayerUnit(index) {
   const accent = leader ? "#2e4157" : "#244056";
   const { group } = createHumanoidBody(color, accent, leader ? 1 : 0.92);
   applyWeaponMesh(group, state.weaponTier, leader ? 1 : 0.92);
+
+  if (leader) {
+    const ring = new THREE.Mesh(
+      new THREE.TorusGeometry(1.05, 0.12, 12, 28),
+      new THREE.MeshBasicMaterial({ color: "#9fe7ff", transparent: true, opacity: 0.9 })
+    );
+    ring.rotation.x = Math.PI / 2;
+    ring.position.y = 0.12;
+    group.add(ring);
+  }
+
   return group;
 }
 
@@ -452,12 +483,12 @@ function createEnemy(kind = "trooper", hp = profile.enemyHp) {
     mesh: group,
     lane: 1,
     z: -120,
-    speed: kind === "boss" ? profile.bossSpeed : profile.enemySpeed * (0.9 + Math.random() * 0.3),
+    speed: kind === "boss" ? profile.bossSpeed : profile.enemySpeed,
     hp,
     maxHp: hp,
     kind,
     damage: kind === "boss" ? 0 : profile.enemyDamage,
-    runOffset: Math.random() * Math.PI * 2,
+    runOffset: 0,
   };
 }
 
@@ -571,7 +602,44 @@ function createBonusBubble() {
   };
 }
 
-function createUpgradeTarget() {
+function createCountBubble(cap = 5) {
+  const bubble = new THREE.Group();
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1.55, 22, 22),
+    new THREE.MeshStandardMaterial({
+      color: "#b6f7ff",
+      emissive: "#1d4d69",
+      transparent: true,
+      opacity: 0.84,
+      roughness: 0.14,
+      metalness: 0.05,
+    })
+  );
+  sphere.castShadow = true;
+  bubble.add(sphere);
+
+  const label = createTextBillboard([
+    { text: "+0", font: "700 96px 'Space Grotesk', sans-serif", color: "#ffffff", y: 122 },
+    { text: `CAP ${cap}`, font: "700 42px 'Space Grotesk', sans-serif", color: "#6cf0c2", y: 204 },
+  ], "#9aefff", 2.8, 1.6);
+  label.position.set(0, 0, 1.55);
+  bubble.add(label);
+
+  return {
+    mesh: bubble,
+    sphere,
+    label,
+    kind: "counter",
+    lane: 1,
+    z: -30,
+    speed: profile.enemySpeed * 0.76,
+    spin: 0,
+    value: 0,
+    cap,
+  };
+}
+
+function createUpgradeTarget(kind = "rate", upgradeValue = 0.25) {
   const group = new THREE.Group();
   const base = new THREE.Mesh(
     new THREE.CylinderGeometry(1.15, 1.4, 1.8, 8),
@@ -590,8 +658,12 @@ function createUpgradeTarget() {
   group.add(barrel);
 
   const hp = profile.upgradeTargetHp;
+  const title =
+    kind === "shots" ? "MORE SHOTS" :
+    kind === "both" ? "FIRE UP" :
+    "FIRE RATE";
   const label = createTextBillboard([
-    { text: "WEAPON UP", font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
+    { text: title, font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
     { text: `${hp} HITS`, font: "700 84px 'Space Grotesk', sans-serif", color: "#67c6ff", y: 182 },
   ], "#67c6ff");
   label.position.set(0, 5.8, 0.2);
@@ -606,6 +678,9 @@ function createUpgradeTarget() {
     hp,
     maxHp: hp,
     bob: Math.random() * Math.PI * 2,
+    upgradeKind: kind,
+    upgradeValue,
+    title,
   };
 }
 
@@ -623,14 +698,15 @@ function spawnEnemyCluster() {
     const enemy = createEnemy("trooper", profile.enemyHp);
     enemy.lane = laneOrder[i % laneOrder.length];
     enemy.z = clusterScript.baseZ - Math.floor(i / laneOrder.length) * clusterScript.rowSpacing;
-    enemy.speed = profile.enemySpeed * (0.96 + (i % laneOrder.length) * 0.04);
+    enemy.speed = profile.enemySpeed;
+    enemy.runOffset = i * 0.35;
     enemy.mesh.position.set(laneXs[enemy.lane], 0, enemy.z);
     scene.add(enemy.mesh);
     sceneObjects.enemies.push(enemy);
   }
 
   if (clusterScript.includeUpgrade) {
-    const target = createUpgradeTarget();
+    const target = createUpgradeTarget(clusterScript.upgradeKind, clusterScript.upgradeValue);
     target.lane = clusterScript.upgradeLane;
     target.z = clusterScript.baseZ - clusterScript.upgradeOffset;
     target.mesh.position.set(laneXs[target.lane], 0, target.z);
@@ -639,12 +715,12 @@ function spawnEnemyCluster() {
   }
 
   if (clusterScript.includeBubble) {
-    const bubble = createBonusBubble();
+    const bubble = createCountBubble(clusterScript.bubbleCap);
     bubble.lane = clusterScript.bubbleLane;
     bubble.z = clusterScript.baseZ + clusterScript.bubbleOffset;
     bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
     scene.add(bubble.mesh);
-    sceneObjects.pickups.push(bubble);
+    sceneObjects.countBubbles.push(bubble);
   }
 
   state.clusterCount += 1;
@@ -662,7 +738,7 @@ function createGateLabel(option, color) {
 
 function spawnGate() {
   clearGroupEntries(sceneObjects.gates);
-  const leftType = Math.random() > 0.5 ? "units" : "weapon";
+  const leftType = (state.level + state.encounter) % 2 === 0 ? "units" : "weapon";
   const rightType = leftType === "units" ? "weapon" : "units";
   const options = [
     { type: leftType, value: leftType === "units" ? profile.addUnitsGate : profile.weaponGate, x: -10 },
@@ -721,9 +797,10 @@ function addMuzzleFlash(x, y, z, color) {
 }
 
 function fireVolley() {
-  const shots = Math.max(1, Math.min(12, 1 + Math.floor(state.units / 2)));
+  const squadShots = Math.max(1, Math.min(12, 1 + Math.floor(state.units / 2)));
+  const shots = squadShots * state.shotCount;
   for (let i = 0; i < shots; i += 1) {
-    const spread = (i - (shots - 1) / 2) * 0.42;
+    const spread = (i - (shots - 1) / 2) * 0.34;
     const bullet = new THREE.Mesh(
       new THREE.SphereGeometry(0.11 + state.weaponTier * 0.02, 10, 10),
       new THREE.MeshBasicMaterial({ color: palette.gun[Math.min(state.weaponTier + 1, palette.gun.length - 1)] })
@@ -749,6 +826,9 @@ function awardCombo() {
 
 function applyPickup(pickup) {
   if (pickup.kind === "bonus") {
+    state.units += pickup.value;
+    state.maxUnits = Math.max(state.maxUnits, state.units);
+  } else if (pickup.kind === "counter") {
     state.units += pickup.value;
     state.maxUnits = Math.max(state.maxUnits, state.units);
   } else {
@@ -846,11 +926,14 @@ function updateCombat(dt) {
     state.clusterCount >= state.clustersPerEncounter &&
     sceneObjects.enemies.length === 0 &&
     sceneObjects.upgradeTargets.length === 0 &&
-    sceneObjects.pickups.length === 0;
+    sceneObjects.pickups.length === 0 &&
+    sceneObjects.countBubbles.length === 0;
 
   if (state.combatTimer >= profile.combatDuration || clearedEncounter) {
     clearGroupEntries(sceneObjects.pickups);
     sceneObjects.pickups.length = 0;
+    clearGroupEntries(sceneObjects.countBubbles);
+    sceneObjects.countBubbles.length = 0;
     clearGroupEntries(sceneObjects.upgradeTargets);
     sceneObjects.upgradeTargets.length = 0;
     clearGroupEntries(sceneObjects.enemies);
@@ -977,6 +1060,33 @@ function updateMovingObjects(dt) {
     }
   }
 
+  for (let i = sceneObjects.countBubbles.length - 1; i >= 0; i -= 1) {
+    const bubble = sceneObjects.countBubbles[i];
+    bubble.z += bubble.speed * dt;
+    bubble.spin += dt * 2.2;
+    bubble.mesh.position.set(laneXs[bubble.lane], 2.2 + Math.sin(bubble.spin) * 0.28, bubble.z);
+    bubble.sphere.rotation.y += dt * 0.7;
+    bubble.sphere.rotation.x = Math.sin(bubble.spin * 0.7) * 0.16;
+    bubble.label.lookAt(camera.position);
+    updateBillboardText(bubble.label, [
+      { text: `+${bubble.value}`, font: "700 96px 'Space Grotesk', sans-serif", color: "#ffffff", y: 122 },
+      { text: `CAP ${bubble.cap}`, font: "700 42px 'Space Grotesk', sans-serif", color: "#6cf0c2", y: 204 },
+    ], "#9aefff");
+
+    if (Math.abs(bubble.z - playerZ) < 1.9 && Math.abs(laneXs[bubble.lane] - state.playerX) < 2.8) {
+      applyPickup(bubble);
+      scene.remove(bubble.mesh);
+      sceneObjects.countBubbles.splice(i, 1);
+      syncHud();
+      continue;
+    }
+
+    if (bubble.z > 44) {
+      scene.remove(bubble.mesh);
+      sceneObjects.countBubbles.splice(i, 1);
+    }
+  }
+
   for (let i = sceneObjects.upgradeTargets.length - 1; i >= 0; i -= 1) {
     const target = sceneObjects.upgradeTargets[i];
     target.z += target.speed * dt;
@@ -985,7 +1095,7 @@ function updateMovingObjects(dt) {
     target.label.lookAt(camera.position);
 
     updateBillboardText(target.label, [
-      { text: "WEAPON UP", font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
+      { text: target.title, font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
       { text: `${target.hp} HITS`, font: "700 84px 'Space Grotesk', sans-serif", color: "#67c6ff", y: 182 },
     ], "#67c6ff");
 
@@ -1043,14 +1153,33 @@ function processHits() {
     }
 
     if (!hit) {
+      for (let j = sceneObjects.countBubbles.length - 1; j >= 0; j -= 1) {
+        const bubble = sceneObjects.countBubbles[j];
+        if (bullet.mesh.position.distanceTo(bubble.mesh.position.clone().setY(2.2)) < 2.05) {
+          bubble.value = Math.min(bubble.cap, bubble.value + 1);
+          hit = true;
+          break;
+        }
+      }
+    }
+
+    if (!hit) {
       for (let j = sceneObjects.upgradeTargets.length - 1; j >= 0; j -= 1) {
         const target = sceneObjects.upgradeTargets[j];
         if (bullet.mesh.position.distanceTo(target.mesh.position.clone().setY(2.4)) < 2.35) {
           target.hp -= bullet.damage;
           hit = true;
           if (target.hp <= 0) {
-            state.weaponTier = Math.min(4, state.weaponTier + 1);
-            state.fireRate = Math.min(8.2, state.fireRate + 0.3);
+            if (target.upgradeKind === "shots") {
+              state.shotCount = Math.min(5, state.shotCount + target.upgradeValue);
+            } else if (target.upgradeKind === "both") {
+              state.shotCount = Math.min(5, state.shotCount + target.upgradeValue);
+              state.fireRate = Math.min(8.2, state.fireRate + 0.24);
+              state.weaponTier = Math.min(4, state.weaponTier + 1);
+            } else {
+              state.fireRate = Math.min(8.2, state.fireRate + target.upgradeValue);
+              state.weaponTier = Math.min(4, state.weaponTier + 1);
+            }
             state.score += 65 + state.level * 10;
             rebuildPlayerFormation();
             scene.remove(target.mesh);
@@ -1122,8 +1251,7 @@ function frame(now) {
 function setTargetXFromClientX(clientX) {
   const rect = canvas.getBoundingClientRect();
   const relativeX = clientX - rect.left;
-  const normalized = Math.max(0, Math.min(1, relativeX / rect.width));
-  state.targetX = THREE.MathUtils.lerp(-roadHalfWidth, roadHalfWidth, normalized);
+  state.targetX = relativeX < rect.width / 2 ? laneXs[0] : laneXs[1];
 }
 
 let activePointerId = null;
