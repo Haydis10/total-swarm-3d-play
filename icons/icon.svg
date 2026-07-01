@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#203a56"/>
+      <stop offset="100%" stop-color="#0c1523"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#2c3642"/>
+      <stop offset="100%" stop-color="#161b23"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="108" fill="url(#bg)"/>
+  <path d="M176 60h160l110 392H66L176 60z" fill="url(#road)"/>
+  <rect x="245" y="110" width="22" height="56" rx="8" fill="#ffe49b"/>
+  <rect x="238" y="208" width="36" height="76" rx="10" fill="#ffe49b"/>
+  <rect x="230" y="340" width="52" height="96" rx="12" fill="#ffe49b"/>
+  <g transform="translate(256 374)">
+    <ellipse cx="0" cy="70" rx="96" ry="36" fill="#09131f" opacity=".6"/>
+    <circle cx="-52" cy="46" r="20" fill="#f0c6a8"/>
+    <circle cx="0" cy="28" r="24" fill="#f0c6a8"/>
+    <circle cx="52" cy="46" r="20" fill="#f0c6a8"/>
+    <rect x="-72" y="48" width="40" height="58" fill="#78d5ff"/>
+    <rect x="-22" y="28" width="44" height="74" fill="#d8f6ff"/>
+    <rect x="32" y="48" width="40" height="58" fill="#78d5ff"/>
+    <rect x="18" y="54" width="48" height="8" rx="4" fill="#d9dee6" transform="rotate(-16 18 54)"/>
+  </g>
+  <g transform="translate(374 174)">
+    <circle cx="0" cy="0" r="18" fill="#f0c6a8"/>
+    <rect x="-12" y="16" width="24" height="44" rx="8" fill="#ef4545"/>
+    <rect x="10" y="22" width="34" height="7" rx="3" fill="#6f121b" transform="rotate(-15 10 22)"/>
+  </g>
+</svg>

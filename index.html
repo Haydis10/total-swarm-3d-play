@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="theme-color" content="#0c1523">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Total Swarm Prototype</title>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="./icons/icon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <main class="shell">
+    <section class="hud">
+      <div>
+        <p class="label">Squad</p>
+        <p class="value" id="unitCount">12</p>
+      </div>
+      <div>
+        <p class="label">Level</p>
+        <p class="value" id="waveCount">1</p>
+      </div>
+      <div>
+        <p class="label">Score</p>
+        <p class="value" id="scoreCount">0</p>
+      </div>
+      <div>
+        <p class="label">Combo</p>
+        <p class="value" id="comboCount">0x</p>
+      </div>
+    </section>
+
+    <section class="arena-wrap">
+      <canvas id="game" width="540" height="960" aria-label="Total Swarm prototype"></canvas>
+
+      <div class="overlay" id="startOverlay">
+        <div class="panel">
+          <p class="eyebrow">Prototype</p>
+          <h1>Total Swarm</h1>
+          <p class="copy">
+            March up the street as a machine-gunner, drag across three lanes, recruit more
+            shooters, upgrade your weapons, and cut down charging red troopers.
+          </p>
+          <button id="startButton">Start Run</button>
+        </div>
+      </div>
+
+      <div class="overlay hidden" id="endOverlay">
+        <div class="panel">
+          <p class="eyebrow">Run Over</p>
+          <h2 id="endTitle">You were overrun.</h2>
+          <p class="copy" id="endSummary"></p>
+          <button id="restartButton">Try Again</button>
+        </div>
+      </div>
+    </section>
+
+    <section class="tips">
+      <p>Drag across the three lanes to reposition your lead gunner and line up shots.</p>
+      <p>Green crates recruit more shooters. Blue crates improve your guns and fire rate.</p>
+      <p>Red troopers charge down the street. Keep the combo alive for faster scaling.</p>
+    </section>
+  </main>
+
+  <script type="module" src="./game.js"></script>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./service-worker.js").catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
