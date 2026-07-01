@@ -203,12 +203,12 @@ function buildLevelScript(level, currentProfile) {
         delay: Math.max(1.9, template.gapAfter - currentProfile.danger * 0.5),
         includeUpgrade: true,
         upgradeLane: template.upgradeLane,
-        upgradeOffset: 1.5,
+        upgradeOffset: 3.6,
         upgradeKind: template.upgradeKind,
         upgradeValue: template.upgradeValue,
         includeBubble: true,
         bubbleLane: template.upgradeLane,
-        bubbleOffset: 3.4,
+        bubbleOffset: 6.2,
         bubbleCap: template.bubbleCap + scale,
       });
     }
@@ -718,7 +718,7 @@ function spawnEnemyCluster() {
     const bubble = createCountBubble(clusterScript.bubbleCap);
     bubble.lane = clusterScript.bubbleLane;
     bubble.z = clusterScript.baseZ + clusterScript.bubbleOffset;
-    bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
+    bubble.mesh.position.set(laneXs[bubble.lane] + (bubble.lane === 0 ? -0.9 : 0.9), 2.7, bubble.z);
     scene.add(bubble.mesh);
     sceneObjects.countBubbles.push(bubble);
   }
@@ -1076,7 +1076,8 @@ function updateMovingObjects(dt) {
     const bubble = sceneObjects.countBubbles[i];
     bubble.z += bubble.speed * dt;
     bubble.spin += dt * 2.2;
-    bubble.mesh.position.set(laneXs[bubble.lane], 2.2 + Math.sin(bubble.spin) * 0.28, bubble.z);
+    const laneOffsetX = bubble.lane === 0 ? -0.9 : 0.9;
+    bubble.mesh.position.set(laneXs[bubble.lane] + laneOffsetX, 2.7 + Math.sin(bubble.spin) * 0.28, bubble.z);
     bubble.sphere.rotation.y += dt * 0.7;
     bubble.sphere.rotation.x = Math.sin(bubble.spin * 0.7) * 0.16;
     bubble.label.lookAt(camera.position);
@@ -1085,7 +1086,7 @@ function updateMovingObjects(dt) {
       { text: `CAP ${bubble.cap}`, font: "700 42px 'Space Grotesk', sans-serif", color: "#6cf0c2", y: 204 },
     ], "#9aefff");
 
-    if (Math.abs(bubble.z - playerZ) < 1.9 && Math.abs(laneXs[bubble.lane] - state.playerX) < 2.8) {
+    if (Math.abs(bubble.z - playerZ) < 2.2 && Math.abs((laneXs[bubble.lane] + laneOffsetX) - state.playerX) < 3.6) {
       applyPickup(bubble);
       scene.remove(bubble.mesh);
       sceneObjects.countBubbles.splice(i, 1);
@@ -1167,7 +1168,7 @@ function processHits() {
     if (!hit) {
       for (let j = sceneObjects.countBubbles.length - 1; j >= 0; j -= 1) {
         const bubble = sceneObjects.countBubbles[j];
-        if (bullet.mesh.position.distanceTo(bubble.mesh.position.clone().setY(2.2)) < 2.05) {
+        if (bullet.mesh.position.distanceTo(bubble.mesh.position.clone().setY(2.6)) < 3.1) {
           bubble.value = Math.min(bubble.cap, bubble.value + 1);
           hit = true;
           break;
