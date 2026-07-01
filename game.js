@@ -12,7 +12,7 @@ const endOverlay = document.getElementById("endOverlay");
 const endTitle = document.getElementById("endTitle");
 const endSummary = document.getElementById("endSummary");
 
-const laneXs = [-8.5, 0, 8.5];
+const laneXs = [-6.5, 6.5];
 const roadHalfWidth = 11;
 const playerZ = 20;
 const chosenLevel = Math.max(1, Math.min(100, Number(new URLSearchParams(window.location.search).get("level")) || 1));
@@ -83,8 +83,8 @@ const state = {
   maxUnits: 1,
   fireRate: 3.2,
   weaponTier: 0,
-  targetX: laneXs[1],
-  playerX: laneXs[1],
+  targetX: 0,
+  playerX: 0,
   roadScroll: 0,
   walkTime: 0,
   clusterTimer: 0,
@@ -108,19 +108,19 @@ function getLevelProfile(level) {
     danger,
     startingUnits: 1,
     startingFireRate: (1.55 + (1 - danger) * 0.18) * 1.3,
-    encountersPerLevel: 2 + Math.floor(danger * 3),
-    combatDuration: Math.max(12, 22 - danger * 7),
-    clusterInterval: Math.max(0.55, 1.15 - danger * 0.35),
-    clustersPerEncounter: 7 + Math.floor(danger * 4),
+    encountersPerLevel: 2 + Math.floor(danger * 2),
+    combatDuration: Math.max(10, 18 - danger * 5),
+    clusterInterval: Math.max(0.85, 1.75 - danger * 0.5),
+    clustersPerEncounter: 4 + Math.floor(danger * 3),
     roadSpeed: 4 + danger * 3.2,
     enemySpeed: 3.4 + danger * 5.2,
-    enemyHp: Math.round(2 + level * 0.08 + danger * 6),
-    enemyDamage: Math.max(1, Math.round(1 + danger * 6)),
-    bossHp: Math.round(24 + level * 3 + danger * 120),
-    bossSpeed: 2.4 + danger * 3.4,
+    enemyHp: Math.max(1, Math.round(1 + level * 0.04 + danger * 4)),
+    enemyDamage: Math.max(1, Math.round(1 + danger * 4)),
+    bossHp: Math.round(16 + level * 2 + danger * 80),
+    bossSpeed: 2 + danger * 2.8,
     bossAttackInterval: Math.max(0.9, 2.2 - danger * 0.8),
-    upgradeTargetHp: Math.round(7 + level * 0.18 + danger * 8),
-    bonusBubbleChance: 0.8,
+    upgradeTargetHp: Math.round(4 + level * 0.12 + danger * 5),
+    bonusBubbleChance: 0.45,
     upgradeTargetChance: 1,
   };
 }
@@ -166,14 +166,15 @@ function buildLevelScript(level, currentProfile) {
   for (let encounterIndex = 0; encounterIndex < currentProfile.encountersPerLevel; encounterIndex += 1) {
     const clusters = [];
     for (let clusterIndex = 0; clusterIndex < currentProfile.clustersPerEncounter; clusterIndex += 1) {
-      const clusterSize = 3 + Math.floor(rng() * (2 + Math.round(currentProfile.danger * 1.5)));
-      const baseZ = -18 - rng() * 6;
+      const clusterSize = 2 + Math.floor(rng() * (1 + Math.round(currentProfile.danger * 2)));
+      const baseZ = -16 - rng() * 5;
       const side = rng() > 0.5 ? "left" : "right";
-      const enemyLanes = side === "left" ? [0, 1] : [1, 2];
-      const upgradeLane = side === "left" ? 2 : 0;
+      const enemyLane = side === "left" ? 0 : 1;
+      const enemyLanes = [enemyLane];
+      const upgradeLane = side === "left" ? 1 : 0;
       const bubbleLane = upgradeLane;
-      const rowSpacing = 3.2 + rng() * 0.6;
-      const delay = currentProfile.clusterInterval * (0.9 + rng() * 0.22);
+      const rowSpacing = 2.8 + rng() * 0.5;
+      const delay = currentProfile.clusterInterval * (0.95 + rng() * 0.35);
 
       clusters.push({
         clusterSize,
@@ -184,7 +185,7 @@ function buildLevelScript(level, currentProfile) {
         delay,
         includeUpgrade: true,
         upgradeLane,
-        upgradeOffset: 1.8 + rng() * 1.2,
+        upgradeOffset: 1.4 + rng() * 0.8,
         includeBubble: rng() < currentProfile.bonusBubbleChance,
         bubbleLane,
         bubbleOffset: 2.2,
@@ -220,8 +221,8 @@ function resetState(level = chosenLevel) {
   state.maxUnits = state.units;
   state.fireRate = profile.startingFireRate;
   state.weaponTier = 0;
-  state.targetX = laneXs[1];
-  state.playerX = laneXs[1];
+  state.targetX = 0;
+  state.playerX = 0;
   state.roadScroll = 0;
   state.walkTime = 0;
   state.clusterTimer = 0.05;
@@ -839,14 +840,6 @@ function updateCombat(dt) {
   if (state.fireTimer <= 0) {
     fireVolley();
     state.fireTimer = 1 / state.fireRate;
-  }
-
-  const visiblePressure =
-    sceneObjects.enemies.filter((enemy) => enemy.z > -32 && enemy.z < 24).length +
-    sceneObjects.upgradeTargets.filter((target) => target.z > -32 && target.z < 20).length;
-
-  if (visiblePressure < 4 && state.clusterCount < state.clustersPerEncounter) {
-    state.clusterTimer = Math.min(state.clusterTimer, 0.12);
   }
 
   const clearedEncounter =

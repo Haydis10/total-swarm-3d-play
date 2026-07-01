@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260701h">
+  <link rel="stylesheet" href="./styles.css?v=20260701i">
 </head>
 <body>
   <main class="shell">
@@ -43,8 +43,8 @@
           <p class="eyebrow">Prototype</p>
           <h1>Total Swarm</h1>
           <p class="copy">
-            Drift across three lanes, mow down slow red rushes, touch +1 bubbles for extra
-            shooters, and burn through weapon-up targets before they pass you by.
+            Switch across two lanes, clear enemy waves on one side, and decide whether the
+            opposite lane's big weapon target is worth the risk.
           </p>
           <button id="startButton">Start Run</button>
         </div>
@@ -61,17 +61,17 @@
     </section>
 
     <section class="tips">
-      <p>Drag sideways to choose which lane gets your bullets and which threats you ignore.</p>
+      <p>Drag sideways between two lanes to choose the safe lane and the reward lane.</p>
       <p>Touch the glowing +1 bubbles to add one shooter to your squad.</p>
-      <p>Blue weapon targets need repeated hits before they pass. Red troopers keep closing in.</p>
+      <p>Enemy waves arrive in beats. The big blue weapon target sits on the opposite lane.</p>
     </section>
   </main>
 
-  <script type="module" src="./game.js?v=20260701h"></script>
+  <script type="module" src="./game.js?v=20260701i"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=20260701h").catch(() => {});
+        navigator.serviceWorker.register("./service-worker.js?v=20260701i").catch(() => {});
       });
     }
   </script>
