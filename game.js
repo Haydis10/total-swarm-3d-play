@@ -14,7 +14,7 @@ const endSummary = document.getElementById("endSummary");
 
 const laneXs = [-8.5, 0, 8.5];
 const roadHalfWidth = 11;
-const playerZ = 24;
+const playerZ = 20;
 const chosenLevel = Math.max(1, Math.min(100, Number(new URLSearchParams(window.location.search).get("level")) || 1));
 
 const renderer = new THREE.WebGLRenderer({
@@ -31,9 +31,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#1c2f47");
 scene.fog = new THREE.Fog("#1a2433", 52, 180);
 
-const camera = new THREE.PerspectiveCamera(50, 1, 0.1, 300);
-camera.position.set(0, 28, 34);
-camera.lookAt(0, 0, 4);
+const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 300);
+camera.position.set(0, 34, 28);
+camera.lookAt(0, 0, 10);
 
 const hemiLight = new THREE.HemisphereLight("#c8ecff", "#30405a", 2.2);
 scene.add(hemiLight);
@@ -505,7 +505,7 @@ function createBonusBubble() {
     sphere,
     kind: "bonus",
     lane: 1,
-    z: -58,
+    z: -34,
     speed: profile.enemySpeed * 0.94,
     spin: Math.random() * Math.PI * 2,
     value: 1,
@@ -542,7 +542,7 @@ function createUpgradeTarget() {
     mesh: group,
     label,
     lane: 1,
-    z: -74,
+    z: -42,
     speed: profile.enemySpeed * 0.82,
     hp,
     maxHp: hp,
@@ -552,13 +552,13 @@ function createUpgradeTarget() {
 
 function spawnEnemyCluster() {
   const clusterSize = 4 + Math.floor(Math.random() * (2 + Math.round(profile.danger * 3)));
-  const baseZ = -52 - Math.random() * 18;
+  const baseZ = -30 - Math.random() * 10;
   const laneOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
 
   for (let i = 0; i < clusterSize; i += 1) {
     const enemy = createEnemy("trooper", profile.enemyHp);
     enemy.lane = laneOrder[i % laneOrder.length];
-    enemy.z = baseZ - i * (4.8 + Math.random() * 2.2);
+    enemy.z = baseZ - i * (3.2 + Math.random() * 1.2);
     enemy.speed = profile.enemySpeed * (0.9 + Math.random() * 0.18);
     enemy.mesh.position.set(laneXs[enemy.lane], 0, enemy.z);
     scene.add(enemy.mesh);
@@ -568,7 +568,7 @@ function spawnEnemyCluster() {
   if (Math.random() < profile.upgradeTargetChance) {
     const target = createUpgradeTarget();
     target.lane = Math.floor(Math.random() * laneXs.length);
-    target.z = baseZ - 10 - Math.random() * 10;
+    target.z = baseZ - 5 - Math.random() * 4;
     target.mesh.position.set(laneXs[target.lane], 0, target.z);
     scene.add(target.mesh);
     sceneObjects.upgradeTargets.push(target);
@@ -577,7 +577,7 @@ function spawnEnemyCluster() {
   if (Math.random() < profile.bonusBubbleChance) {
     const bubble = createBonusBubble();
     bubble.lane = Math.floor(Math.random() * laneXs.length);
-    bubble.z = baseZ - 2;
+    bubble.z = baseZ + 1.5;
     bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
     scene.add(bubble.mesh);
     sceneObjects.pickups.push(bubble);
@@ -624,7 +624,7 @@ function spawnGate() {
     const label = createGateLabel(option, color);
 
     frame.add(leftPost, rightPost, topBar, panel, label);
-    frame.position.set(option.x, 0, -92);
+    frame.position.set(option.x, 0, -46);
     frame.userData = option;
     scene.add(frame);
     sceneObjects.gates.push(frame);
@@ -637,7 +637,7 @@ function spawnGate() {
 function spawnBoss() {
   const boss = createEnemy("boss", profile.bossHp);
   boss.lane = 1;
-  boss.z = -132;
+  boss.z = -58;
   boss.mesh.position.set(0, 0, boss.z);
   boss.speed = profile.bossSpeed;
   scene.add(boss.mesh);
