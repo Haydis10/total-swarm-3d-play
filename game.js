@@ -449,6 +449,39 @@ function addObjectToLane(object) {
   scene.add(object.mesh);
 }
 
+function createGateLabel(option, color) {
+  const canvasEl = document.createElement("canvas");
+  canvasEl.width = 512;
+  canvasEl.height = 256;
+  const ctx = canvasEl.getContext("2d");
+
+  ctx.fillStyle = "rgba(7, 16, 28, 0.86)";
+  ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(12, 12, canvasEl.width - 24, canvasEl.height - 24);
+
+  ctx.textAlign = "center";
+  ctx.fillStyle = "#eef7ff";
+  ctx.font = "700 54px 'Space Grotesk', sans-serif";
+  ctx.fillText(option.type === "units" ? "MORE GUNNERS" : "WEAPON UP", canvasEl.width / 2, 92);
+
+  ctx.fillStyle = color;
+  ctx.font = "700 96px 'Space Grotesk', sans-serif";
+  const prefix = option.type === "units" ? "+" : "T";
+  ctx.fillText(`${prefix}${option.value}`, canvasEl.width / 2, 188);
+
+  const texture = new THREE.CanvasTexture(canvasEl);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  const material = new THREE.MeshBasicMaterial({
+    map: texture,
+    transparent: true,
+  });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 2.4), material);
+  sign.position.set(0, 3.15, -0.29);
+  return sign;
+}
+
 function spawnGate() {
   clearGroupEntries(sceneObjects.gates);
   const leftType = Math.random() > 0.5 ? "units" : "weapon";
@@ -474,8 +507,9 @@ function spawnGate() {
       new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0.26 })
     );
     panel.position.set(0, 3.1, -0.26);
+    const label = createGateLabel(option, color);
 
-    frame.add(leftPost, rightPost, topBar, panel);
+    frame.add(leftPost, rightPost, topBar, panel, label);
     frame.position.set(option.x, 0, -92);
     frame.userData = option;
     scene.add(frame);
