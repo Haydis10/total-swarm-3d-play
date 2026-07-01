@@ -934,22 +934,21 @@ function updateCombat(dt) {
     state.fireTimer = 1 / state.fireRate;
   }
 
-  const clearedEncounter =
+  const encounterWaveDone =
     state.clusterCount >= state.clustersPerEncounter &&
-    sceneObjects.enemies.length === 0 &&
     sceneObjects.upgradeTargets.length === 0 &&
-    sceneObjects.pickups.length === 0 &&
     sceneObjects.countBubbles.length === 0;
 
-  if (state.combatTimer >= profile.combatDuration || clearedEncounter) {
-    clearGroupEntries(sceneObjects.pickups);
-    sceneObjects.pickups.length = 0;
-    clearGroupEntries(sceneObjects.countBubbles);
-    sceneObjects.countBubbles.length = 0;
-    clearGroupEntries(sceneObjects.upgradeTargets);
-    sceneObjects.upgradeTargets.length = 0;
-    clearGroupEntries(sceneObjects.enemies);
-    sceneObjects.enemies.length = 0;
+  const levelFieldCleared =
+    encounterWaveDone &&
+    sceneObjects.enemies.length === 0 &&
+    sceneObjects.pickups.length === 0;
+
+  if (state.combatTimer >= profile.combatDuration && state.clusterCount < state.clustersPerEncounter) {
+    state.clusterTimer = 0.05;
+  }
+
+  if (levelFieldCleared) {
     state.combatTimer = 0;
     state.clusterCount = 0;
     state.clusterTimer = 0.8;
