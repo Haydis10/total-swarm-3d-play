@@ -12,7 +12,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./styles.css?v=20260701c">
+  <link rel="stylesheet" href="./styles.css?v=20260701d">
 </head>
 <body>
   <main class="shell">
@@ -43,8 +43,8 @@
           <p class="eyebrow">Prototype</p>
           <h1>Total Swarm</h1>
           <p class="copy">
-            March up the street as a machine-gunner, drag across three lanes, recruit more
-            shooters, upgrade your weapons, and cut down charging red troopers.
+            Drift across three lanes, mow down slow red rushes, touch +1 bubbles for extra
+            shooters, and burn through weapon-up targets before they pass you by.
           </p>
           <button id="startButton">Start Run</button>
         </div>
@@ -61,17 +61,17 @@
     </section>
 
     <section class="tips">
-      <p>Drag across the three lanes to reposition your lead gunner and line up shots.</p>
-      <p>Green crates recruit more shooters. Blue crates improve your guns and fire rate.</p>
-      <p>Red troopers charge down the street. Keep the combo alive for faster scaling.</p>
+      <p>Drag sideways to choose which lane gets your bullets and which threats you ignore.</p>
+      <p>Touch the glowing +1 bubbles to add one shooter to your squad.</p>
+      <p>Blue weapon targets need repeated hits before they pass. Red troopers keep closing in.</p>
     </section>
   </main>
 
-  <script type="module" src="./game.js?v=20260701c"></script>
+  <script type="module" src="./game.js?v=20260701d"></script>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => {
-        navigator.serviceWorker.register("./service-worker.js?v=20260701c").catch(() => {});
+        navigator.serviceWorker.register("./service-worker.js?v=20260701d").catch(() => {});
       });
     }
   </script>

@@ -64,6 +64,7 @@ const sceneObjects = {
   bullets: [],
   enemies: [],
   pickups: [],
+  upgradeTargets: [],
   muzzleFlashes: [],
   particles: [],
   gates: [],
@@ -86,12 +87,14 @@ const state = {
   playerX: laneXs[1],
   roadScroll: 0,
   walkTime: 0,
-  spawnTimer: 0,
+  clusterTimer: 0,
   fireTimer: 0,
   segment: "combat",
   combatTimer: 0,
   encounter: 1,
   encountersPerLevel: 2,
+  clusterCount: 0,
+  clustersPerEncounter: 4,
   gateResolved: false,
   gateTimer: 0,
   boss: null,
@@ -102,21 +105,22 @@ function getLevelProfile(level) {
   const danger = Math.min(1, (level - 1) / 99);
   return {
     danger,
-    startingUnits: Math.round(4 + (1 - danger) * 3),
-    startingFireRate: 3.1 + (1 - danger) * 0.6,
-    encountersPerLevel: 2 + Math.floor(danger * 4),
-    combatDuration: Math.max(3.4, 8.2 - danger * 4.3),
-    spawnInterval: Math.max(0.42, 1.65 - danger * 1.05),
-    enemySpeed: 9 + danger * 14,
-    enemyHp: Math.round(2 + level * 0.12 + danger * 10),
+    startingUnits: Math.round(3 + (1 - danger) * 3),
+    startingFireRate: 2.7 + (1 - danger) * 0.45,
+    encountersPerLevel: 2 + Math.floor(danger * 3),
+    combatDuration: Math.max(12, 22 - danger * 7),
+    clusterInterval: Math.max(1.5, 2.8 - danger * 1),
+    clustersPerEncounter: 4 + Math.floor(danger * 3),
+    roadSpeed: 4 + danger * 3.2,
+    enemySpeed: 3.4 + danger * 5.2,
+    enemyHp: Math.round(2 + level * 0.08 + danger * 6),
     enemyDamage: Math.max(1, Math.round(1 + danger * 6)),
-    bossHp: Math.round(28 + level * 4 + danger * 160),
-    bossSpeed: 4 + danger * 6,
-    bossAttackInterval: Math.max(0.5, 1.8 - danger),
-    addUnitsGate: Math.round(2 + (1 - danger) * 4 + level * 0.12),
-    weaponGate: Math.max(1, Math.round(1 + danger * 2)),
-    boostChance: 0.22,
-    goldChance: 0.1,
+    bossHp: Math.round(24 + level * 3 + danger * 120),
+    bossSpeed: 2.4 + danger * 3.4,
+    bossAttackInterval: Math.max(0.9, 2.2 - danger * 0.8),
+    upgradeTargetHp: Math.round(6 + level * 0.16 + danger * 7),
+    bonusBubbleChance: 0.72,
+    upgradeTargetChance: 0.82,
   };
 }
 
@@ -163,12 +167,14 @@ function resetState(level = chosenLevel) {
   state.playerX = laneXs[1];
   state.roadScroll = 0;
   state.walkTime = 0;
-  state.spawnTimer = 0.3;
+  state.clusterTimer = 0.6;
   state.fireTimer = 0.15;
   state.segment = "combat";
   state.combatTimer = 0;
   state.encounter = 1;
   state.encountersPerLevel = profile.encountersPerLevel;
+  state.clusterCount = 0;
+  state.clustersPerEncounter = profile.clustersPerEncounter;
   state.gateResolved = false;
   state.gateTimer = 0;
   state.boss = null;
@@ -179,6 +185,7 @@ function resetState(level = chosenLevel) {
   clearGroupEntries(sceneObjects.bullets);
   clearGroupEntries(sceneObjects.enemies);
   clearGroupEntries(sceneObjects.pickups);
+  clearGroupEntries(sceneObjects.upgradeTargets);
   clearGroupEntries(sceneObjects.muzzleFlashes);
   clearGroupEntries(sceneObjects.particles);
   clearGroupEntries(sceneObjects.gates);
@@ -417,67 +424,174 @@ function createPickup(kind) {
   };
 }
 
-function spawnCombatObject() {
-  const roll = Math.random();
-  if (roll < profile.goldChance) {
-    const pickup = createPickup("gold");
-    addObjectToLane(pickup);
-    sceneObjects.pickups.push(pickup);
-    return;
-  }
-  if (roll < profile.goldChance + profile.boostChance) {
-    const pickup = createPickup("boost");
-    addObjectToLane(pickup);
-    sceneObjects.pickups.push(pickup);
-    return;
-  }
-  if (roll < profile.goldChance + profile.boostChance + 0.24) {
-    const pickup = createPickup("bonus");
-    addObjectToLane(pickup);
-    sceneObjects.pickups.push(pickup);
-    return;
-  }
-
-  const enemy = createEnemy("trooper", profile.enemyHp);
-  addObjectToLane(enemy);
-  sceneObjects.enemies.push(enemy);
-}
-
 function addObjectToLane(object) {
   object.lane = Math.floor(Math.random() * laneXs.length);
   object.mesh.position.set(laneXs[object.lane], 0, object.z);
   scene.add(object.mesh);
 }
 
-function createGateLabel(option, color) {
+function createTextBillboard(lines, tint, width = 4.8, height = 2.2) {
   const canvasEl = document.createElement("canvas");
   canvasEl.width = 512;
   canvasEl.height = 256;
   const ctx = canvasEl.getContext("2d");
 
-  ctx.fillStyle = "rgba(7, 16, 28, 0.86)";
+  ctx.fillStyle = "rgba(7, 16, 28, 0.88)";
   ctx.fillRect(0, 0, canvasEl.width, canvasEl.height);
-  ctx.strokeStyle = color;
+  ctx.strokeStyle = tint;
   ctx.lineWidth = 10;
   ctx.strokeRect(12, 12, canvasEl.width - 24, canvasEl.height - 24);
-
   ctx.textAlign = "center";
-  ctx.fillStyle = "#eef7ff";
-  ctx.font = "700 54px 'Space Grotesk', sans-serif";
-  ctx.fillText(option.type === "units" ? "MORE GUNNERS" : "WEAPON UP", canvasEl.width / 2, 92);
 
-  ctx.fillStyle = color;
-  ctx.font = "700 96px 'Space Grotesk', sans-serif";
-  const prefix = option.type === "units" ? "+" : "T";
-  ctx.fillText(`${prefix}${option.value}`, canvasEl.width / 2, 188);
+  for (const line of lines) {
+    ctx.fillStyle = line.color;
+    ctx.font = line.font;
+    ctx.fillText(line.text, canvasEl.width / 2, line.y);
+  }
 
   const texture = new THREE.CanvasTexture(canvasEl);
   texture.colorSpace = THREE.SRGBColorSpace;
-  const material = new THREE.MeshBasicMaterial({
-    map: texture,
-    transparent: true,
-  });
-  const sign = new THREE.Mesh(new THREE.PlaneGeometry(4.8, 2.4), material);
+  const material = new THREE.MeshBasicMaterial({ map: texture, transparent: true });
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(width, height), material);
+  sign.userData.texture = texture;
+  sign.userData.ctx = ctx;
+  sign.userData.canvas = canvasEl;
+  return sign;
+}
+
+function updateBillboardText(sign, lines, tint) {
+  const { ctx, canvas, texture } = sign.userData;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.fillStyle = "rgba(7, 16, 28, 0.88)";
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.strokeStyle = tint;
+  ctx.lineWidth = 10;
+  ctx.strokeRect(12, 12, canvas.width - 24, canvas.height - 24);
+  ctx.textAlign = "center";
+
+  for (const line of lines) {
+    ctx.fillStyle = line.color;
+    ctx.font = line.font;
+    ctx.fillText(line.text, canvas.width / 2, line.y);
+  }
+
+  texture.needsUpdate = true;
+}
+
+function createBonusBubble() {
+  const bubble = new THREE.Group();
+  const sphere = new THREE.Mesh(
+    new THREE.SphereGeometry(1.35, 20, 20),
+    new THREE.MeshStandardMaterial({
+      color: "#91ffe0",
+      emissive: "#1d6b5b",
+      transparent: true,
+      opacity: 0.86,
+      roughness: 0.18,
+      metalness: 0.06,
+    })
+  );
+  sphere.castShadow = true;
+  bubble.add(sphere);
+
+  const label = createTextBillboard([
+    { text: "+1", font: "700 112px 'Space Grotesk', sans-serif", color: "#ffffff", y: 148 },
+  ], "#6cf0c2", 2.4, 1.3);
+  label.position.set(0, 0, 1.38);
+  bubble.add(label);
+
+  return {
+    mesh: bubble,
+    sphere,
+    kind: "bonus",
+    lane: 1,
+    z: -58,
+    speed: profile.enemySpeed * 0.94,
+    spin: Math.random() * Math.PI * 2,
+    value: 1,
+  };
+}
+
+function createUpgradeTarget() {
+  const group = new THREE.Group();
+  const base = new THREE.Mesh(
+    new THREE.CylinderGeometry(1.15, 1.4, 1.8, 8),
+    makeMaterial("#67c6ff", "#123049", 0.38, 0.08)
+  );
+  base.castShadow = true;
+  base.position.y = 1.2;
+  group.add(base);
+
+  const barrel = new THREE.Mesh(
+    new THREE.BoxGeometry(0.8, 0.8, 2.8),
+    makeMaterial("#d6e7f5", "#1a3650", 0.28, 0.12)
+  );
+  barrel.castShadow = true;
+  barrel.position.set(0, 2.25, 0);
+  group.add(barrel);
+
+  const hp = profile.upgradeTargetHp;
+  const label = createTextBillboard([
+    { text: "WEAPON UP", font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
+    { text: `${hp} HITS`, font: "700 84px 'Space Grotesk', sans-serif", color: "#67c6ff", y: 182 },
+  ], "#67c6ff");
+  label.position.set(0, 5.8, 0.2);
+  group.add(label);
+
+  return {
+    mesh: group,
+    label,
+    lane: 1,
+    z: -74,
+    speed: profile.enemySpeed * 0.82,
+    hp,
+    maxHp: hp,
+    bob: Math.random() * Math.PI * 2,
+  };
+}
+
+function spawnEnemyCluster() {
+  const clusterSize = 4 + Math.floor(Math.random() * (2 + Math.round(profile.danger * 3)));
+  const baseZ = -52 - Math.random() * 18;
+  const laneOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
+
+  for (let i = 0; i < clusterSize; i += 1) {
+    const enemy = createEnemy("trooper", profile.enemyHp);
+    enemy.lane = laneOrder[i % laneOrder.length];
+    enemy.z = baseZ - i * (4.8 + Math.random() * 2.2);
+    enemy.speed = profile.enemySpeed * (0.9 + Math.random() * 0.18);
+    enemy.mesh.position.set(laneXs[enemy.lane], 0, enemy.z);
+    scene.add(enemy.mesh);
+    sceneObjects.enemies.push(enemy);
+  }
+
+  if (Math.random() < profile.upgradeTargetChance) {
+    const target = createUpgradeTarget();
+    target.lane = Math.floor(Math.random() * laneXs.length);
+    target.z = baseZ - 10 - Math.random() * 10;
+    target.mesh.position.set(laneXs[target.lane], 0, target.z);
+    scene.add(target.mesh);
+    sceneObjects.upgradeTargets.push(target);
+  }
+
+  if (Math.random() < profile.bonusBubbleChance) {
+    const bubble = createBonusBubble();
+    bubble.lane = Math.floor(Math.random() * laneXs.length);
+    bubble.z = baseZ - 2;
+    bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
+    scene.add(bubble.mesh);
+    sceneObjects.pickups.push(bubble);
+  }
+
+  state.clusterCount += 1;
+}
+
+function createGateLabel(option, color) {
+  const prefix = option.type === "units" ? "+" : "T";
+  const sign = createTextBillboard([
+    { text: option.type === "units" ? "MORE GUNNERS" : "WEAPON UP", font: "700 54px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 92 },
+    { text: `${prefix}${option.value}`, font: "700 96px 'Space Grotesk', sans-serif", color, y: 188 },
+  ], color, 4.8, 2.4);
   sign.position.set(0, 3.15, -0.29);
   return sign;
 }
@@ -573,9 +687,6 @@ function applyPickup(pickup) {
   if (pickup.kind === "bonus") {
     state.units += pickup.value;
     state.maxUnits = Math.max(state.maxUnits, state.units);
-  } else if (pickup.kind === "boost") {
-    state.fireRate = Math.min(8.6, state.fireRate + 0.45);
-    state.weaponTier = Math.min(4, state.weaponTier + 1);
   } else {
     state.score += 40 + state.level * 8;
   }
@@ -619,9 +730,9 @@ function syncHud() {
 }
 
 function updateRoad(dt) {
-  state.roadScroll += dt * (8 + profile.danger * 7);
+  state.roadScroll += dt * profile.roadSpeed;
   for (const scroller of sceneObjects.scrollers) {
-    scroller.mesh.position.z += dt * (scroller.speed + profile.danger * 16);
+    scroller.mesh.position.z += dt * (profile.roadSpeed + scroller.speed * 0.18);
     if (scroller.mesh.position.z > scroller.resetThreshold) {
       scroller.mesh.position.z -= scroller.resetSpan;
     }
@@ -629,7 +740,7 @@ function updateRoad(dt) {
 }
 
 function animatePlayer(dt) {
-  state.walkTime += dt * (5.4 + profile.danger * 3);
+  state.walkTime += dt * (3.5 + profile.danger * 1.6);
   state.playerX += (state.targetX - state.playerX) * Math.min(1, dt * 14);
 
   for (let i = 0; i < sceneObjects.playerUnits.length; i += 1) {
@@ -647,7 +758,7 @@ function animatePlayer(dt) {
 
 function updateCombat(dt) {
   state.combatTimer += dt;
-  state.spawnTimer -= dt;
+  state.clusterTimer -= dt;
   state.fireTimer -= dt;
   state.comboTimer -= dt;
 
@@ -655,9 +766,9 @@ function updateCombat(dt) {
     state.combo = 0;
   }
 
-  if (state.spawnTimer <= 0) {
-    spawnCombatObject();
-    state.spawnTimer = profile.spawnInterval * (0.8 + Math.random() * 0.4);
+  if (state.clusterTimer <= 0 && state.clusterCount < state.clustersPerEncounter) {
+    spawnEnemyCluster();
+    state.clusterTimer = profile.clusterInterval * (0.85 + Math.random() * 0.4);
   }
 
   if (state.fireTimer <= 0) {
@@ -665,13 +776,26 @@ function updateCombat(dt) {
     state.fireTimer = 1 / state.fireRate;
   }
 
-  if (state.combatTimer >= profile.combatDuration) {
+  const clearedEncounter =
+    state.clusterCount >= state.clustersPerEncounter &&
+    sceneObjects.enemies.length === 0 &&
+    sceneObjects.upgradeTargets.length === 0 &&
+    sceneObjects.pickups.length === 0;
+
+  if (state.combatTimer >= profile.combatDuration || clearedEncounter) {
     clearGroupEntries(sceneObjects.pickups);
     sceneObjects.pickups.length = 0;
+    clearGroupEntries(sceneObjects.upgradeTargets);
+    sceneObjects.upgradeTargets.length = 0;
     clearGroupEntries(sceneObjects.enemies);
     sceneObjects.enemies.length = 0;
-    spawnGate();
     state.combatTimer = 0;
+    state.clusterCount = 0;
+    state.clusterTimer = 0.8;
+    state.encounter += 1;
+    if (state.encounter > state.encountersPerLevel) {
+      spawnBoss();
+    }
   }
 }
 
@@ -706,7 +830,7 @@ function updateGates(dt) {
       spawnBoss();
     } else {
       state.segment = "combat";
-      state.spawnTimer = 0.25;
+      state.clusterTimer = 0.25;
     }
   }
 }
@@ -768,9 +892,9 @@ function updateMovingObjects(dt) {
     const pickup = sceneObjects.pickups[i];
     pickup.z += pickup.speed * dt;
     pickup.spin += dt * 2.6;
-    pickup.mesh.position.set(laneXs[pickup.lane], 1.45 + Math.sin(pickup.spin) * 0.2, pickup.z);
-    pickup.mesh.rotation.x += dt * 1.2;
-    pickup.mesh.rotation.y += dt * 1.8;
+    pickup.mesh.position.set(laneXs[pickup.lane], 2 + Math.sin(pickup.spin) * 0.3, pickup.z);
+    pickup.sphere.rotation.y += dt * 0.8;
+    pickup.sphere.rotation.x = Math.sin(pickup.spin * 0.7) * 0.18;
 
     if (Math.abs(pickup.z - playerZ) < 1.8 && Math.abs(laneXs[pickup.lane] - state.playerX) < 3.1) {
       applyPickup(pickup);
@@ -783,6 +907,24 @@ function updateMovingObjects(dt) {
     if (pickup.z > 44) {
       scene.remove(pickup.mesh);
       sceneObjects.pickups.splice(i, 1);
+    }
+  }
+
+  for (let i = sceneObjects.upgradeTargets.length - 1; i >= 0; i -= 1) {
+    const target = sceneObjects.upgradeTargets[i];
+    target.z += target.speed * dt;
+    target.bob += dt * 2.1;
+    target.mesh.position.set(laneXs[target.lane], Math.sin(target.bob) * 0.16, target.z);
+    target.label.lookAt(camera.position);
+
+    updateBillboardText(target.label, [
+      { text: "WEAPON UP", font: "700 50px 'Space Grotesk', sans-serif", color: "#eef7ff", y: 84 },
+      { text: `${target.hp} HITS`, font: "700 84px 'Space Grotesk', sans-serif", color: "#67c6ff", y: 182 },
+    ], "#67c6ff");
+
+    if (target.z > 42) {
+      scene.remove(target.mesh);
+      sceneObjects.upgradeTargets.splice(i, 1);
     }
   }
 
@@ -830,6 +972,25 @@ function processHits() {
         scene.remove(state.boss.mesh);
         state.boss = null;
         winRun();
+      }
+    }
+
+    if (!hit) {
+      for (let j = sceneObjects.upgradeTargets.length - 1; j >= 0; j -= 1) {
+        const target = sceneObjects.upgradeTargets[j];
+        if (bullet.mesh.position.distanceTo(target.mesh.position.clone().setY(2.4)) < 2.35) {
+          target.hp -= bullet.damage;
+          hit = true;
+          if (target.hp <= 0) {
+            state.weaponTier = Math.min(4, state.weaponTier + 1);
+            state.fireRate = Math.min(8.2, state.fireRate + 0.3);
+            state.score += 65 + state.level * 10;
+            rebuildPlayerFormation();
+            scene.remove(target.mesh);
+            sceneObjects.upgradeTargets.splice(j, 1);
+          }
+          break;
+        }
       }
     }
 
