@@ -31,9 +31,9 @@ const scene = new THREE.Scene();
 scene.background = new THREE.Color("#1c2f47");
 scene.fog = new THREE.Fog("#1a2433", 52, 180);
 
-const camera = new THREE.PerspectiveCamera(52, 1, 0.1, 300);
-camera.position.set(0, 34, 28);
-camera.lookAt(0, 0, 10);
+const camera = new THREE.PerspectiveCamera(54, 1, 0.1, 300);
+camera.position.set(0, 38, 30);
+camera.lookAt(0, 0, 2);
 
 const hemiLight = new THREE.HemisphereLight("#c8ecff", "#30405a", 2.2);
 scene.add(hemiLight);
@@ -105,12 +105,12 @@ function getLevelProfile(level) {
   const danger = Math.min(1, (level - 1) / 99);
   return {
     danger,
-    startingUnits: Math.round(3 + (1 - danger) * 3),
-    startingFireRate: 2.7 + (1 - danger) * 0.45,
+    startingUnits: 1,
+    startingFireRate: 1.55 + (1 - danger) * 0.18,
     encountersPerLevel: 2 + Math.floor(danger * 3),
     combatDuration: Math.max(12, 22 - danger * 7),
-    clusterInterval: Math.max(1.5, 2.8 - danger * 1),
-    clustersPerEncounter: 4 + Math.floor(danger * 3),
+    clusterInterval: Math.max(0.55, 1.15 - danger * 0.35),
+    clustersPerEncounter: 7 + Math.floor(danger * 4),
     roadSpeed: 4 + danger * 3.2,
     enemySpeed: 3.4 + danger * 5.2,
     enemyHp: Math.round(2 + level * 0.08 + danger * 6),
@@ -118,9 +118,9 @@ function getLevelProfile(level) {
     bossHp: Math.round(24 + level * 3 + danger * 120),
     bossSpeed: 2.4 + danger * 3.4,
     bossAttackInterval: Math.max(0.9, 2.2 - danger * 0.8),
-    upgradeTargetHp: Math.round(6 + level * 0.16 + danger * 7),
-    bonusBubbleChance: 0.72,
-    upgradeTargetChance: 0.82,
+    upgradeTargetHp: Math.round(7 + level * 0.18 + danger * 8),
+    bonusBubbleChance: 0.8,
+    upgradeTargetChance: 1,
   };
 }
 
@@ -167,7 +167,7 @@ function resetState(level = chosenLevel) {
   state.playerX = laneXs[1];
   state.roadScroll = 0;
   state.walkTime = 0;
-  state.clusterTimer = 0.6;
+  state.clusterTimer = 0.05;
   state.fireTimer = 0.15;
   state.segment = "combat";
   state.combatTimer = 0;
@@ -551,15 +551,15 @@ function createUpgradeTarget() {
 }
 
 function spawnEnemyCluster() {
-  const clusterSize = 4 + Math.floor(Math.random() * (2 + Math.round(profile.danger * 3)));
-  const baseZ = -30 - Math.random() * 10;
-  const laneOrder = [0, 1, 2].sort(() => Math.random() - 0.5);
+  const clusterSize = 6 + Math.floor(Math.random() * (2 + Math.round(profile.danger * 2)));
+  const baseZ = -18 - Math.random() * 6;
+  const laneOrder = [0, 1, 2];
 
   for (let i = 0; i < clusterSize; i += 1) {
     const enemy = createEnemy("trooper", profile.enemyHp);
     enemy.lane = laneOrder[i % laneOrder.length];
-    enemy.z = baseZ - i * (3.2 + Math.random() * 1.2);
-    enemy.speed = profile.enemySpeed * (0.9 + Math.random() * 0.18);
+    enemy.z = baseZ - Math.floor(i / laneOrder.length) * (3 + Math.random() * 0.8);
+    enemy.speed = profile.enemySpeed * (0.94 + Math.random() * 0.12);
     enemy.mesh.position.set(laneXs[enemy.lane], 0, enemy.z);
     scene.add(enemy.mesh);
     sceneObjects.enemies.push(enemy);
@@ -567,8 +567,8 @@ function spawnEnemyCluster() {
 
   if (Math.random() < profile.upgradeTargetChance) {
     const target = createUpgradeTarget();
-    target.lane = Math.floor(Math.random() * laneXs.length);
-    target.z = baseZ - 5 - Math.random() * 4;
+    target.lane = (Math.floor(Math.random() * laneXs.length) + 1) % laneXs.length;
+    target.z = baseZ - 2.5 - Math.random() * 2;
     target.mesh.position.set(laneXs[target.lane], 0, target.z);
     scene.add(target.mesh);
     sceneObjects.upgradeTargets.push(target);
@@ -577,7 +577,7 @@ function spawnEnemyCluster() {
   if (Math.random() < profile.bonusBubbleChance) {
     const bubble = createBonusBubble();
     bubble.lane = Math.floor(Math.random() * laneXs.length);
-    bubble.z = baseZ + 1.5;
+    bubble.z = baseZ + 2.2;
     bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
     scene.add(bubble.mesh);
     sceneObjects.pickups.push(bubble);
@@ -661,15 +661,15 @@ function fireVolley() {
   for (let i = 0; i < shots; i += 1) {
     const spread = (i - (shots - 1) / 2) * 0.42;
     const bullet = new THREE.Mesh(
-      new THREE.SphereGeometry(0.16 + state.weaponTier * 0.02, 10, 10),
+      new THREE.SphereGeometry(0.11 + state.weaponTier * 0.02, 10, 10),
       new THREE.MeshBasicMaterial({ color: palette.gun[Math.min(state.weaponTier + 1, palette.gun.length - 1)] })
     );
     bullet.position.set(state.playerX + spread, 2.55 + Math.random() * 0.4, playerZ - 0.8);
     scene.add(bullet);
     sceneObjects.bullets.push({
       mesh: bullet,
-      velocity: 55 + state.weaponTier * 8,
-      damage: 1 + state.weaponTier + Math.floor(state.level / 20),
+      velocity: 42 + state.weaponTier * 7,
+      damage: 1 + Math.floor(state.weaponTier / 2),
     });
   }
   addMuzzleFlash(state.playerX, 2.5, playerZ - 0.9, palette.gun[Math.min(state.weaponTier + 1, palette.gun.length - 1)]);
@@ -774,6 +774,14 @@ function updateCombat(dt) {
   if (state.fireTimer <= 0) {
     fireVolley();
     state.fireTimer = 1 / state.fireRate;
+  }
+
+  const visiblePressure =
+    sceneObjects.enemies.filter((enemy) => enemy.z > -32 && enemy.z < 24).length +
+    sceneObjects.upgradeTargets.filter((target) => target.z > -32 && target.z < 20).length;
+
+  if (visiblePressure < 4 && state.clusterCount < state.clustersPerEncounter) {
+    state.clusterTimer = Math.min(state.clusterTimer, 0.12);
   }
 
   const clearedEncounter =

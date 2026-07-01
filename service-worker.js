@@ -1,9 +1,9 @@
-const CACHE_NAME = "total-swarm-3d-v5";
+const CACHE_NAME = "total-swarm-3d-v6";
 const APP_FILES = [
   "./",
   "./index.html",
-  "./styles.css?v=20260701e",
-  "./game.js?v=20260701e",
+  "./styles.css?v=20260701f",
+  "./game.js?v=20260701f",
   "./manifest.webmanifest",
   "./icons/icon.svg",
   "./lib/three.module.js"
