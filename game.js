@@ -99,6 +99,7 @@ const state = {
   gateTimer: 0,
   boss: null,
   bossAttackTimer: 0,
+  bossMinionCursor: 0,
 };
 
 function getLevelProfile(level) {
@@ -125,6 +126,7 @@ function getLevelProfile(level) {
 }
 
 let profile = getLevelProfile(state.level);
+let levelScript = null;
 
 const palette = {
   squad: new THREE.Color("#9fe7ff"),
@@ -146,6 +148,58 @@ function makeMaterial(color, emissive = "#000000", roughness = 0.5, metalness = 
   });
 }
 
+function createSeededRandom(seed) {
+  let value = seed >>> 0;
+  return () => {
+    value += 0x6D2B79F5;
+    let t = value;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+function buildLevelScript(level, currentProfile) {
+  const rng = createSeededRandom(level * 9973 + 17);
+  const encounters = [];
+
+  for (let encounterIndex = 0; encounterIndex < currentProfile.encountersPerLevel; encounterIndex += 1) {
+    const clusters = [];
+    for (let clusterIndex = 0; clusterIndex < currentProfile.clustersPerEncounter; clusterIndex += 1) {
+      const clusterSize = 6 + Math.floor(rng() * (2 + Math.round(currentProfile.danger * 2)));
+      const baseZ = -18 - rng() * 6;
+      const laneOffset = Math.floor(rng() * laneXs.length);
+      const rowSpacing = 3 + rng() * 0.8;
+      const delay = currentProfile.clusterInterval * (0.9 + rng() * 0.22);
+      const upgradeLane = (laneOffset + 1 + Math.floor(rng() * 2)) % laneXs.length;
+      const bubbleLane = Math.floor(rng() * laneXs.length);
+
+      clusters.push({
+        clusterSize,
+        baseZ,
+        laneOffset,
+        rowSpacing,
+        delay,
+        includeUpgrade: true,
+        upgradeLane,
+        upgradeOffset: 2.5 + rng() * 2,
+        includeBubble: rng() < currentProfile.bonusBubbleChance,
+        bubbleLane,
+        bubbleOffset: 2.2,
+      });
+    }
+
+    encounters.push({ clusters });
+  }
+
+  const bossMinionLanes = [];
+  for (let i = 0; i < 24; i += 1) {
+    bossMinionLanes.push(Math.floor(rng() * laneXs.length));
+  }
+
+  return { encounters, bossMinionLanes };
+}
+
 function clearGroupEntries(entries) {
   for (const item of entries) {
     scene.remove(item.mesh || item.group || item);
@@ -155,6 +209,7 @@ function clearGroupEntries(entries) {
 
 function resetState(level = chosenLevel) {
   profile = getLevelProfile(level);
+  levelScript = buildLevelScript(level, profile);
   state.level = level;
   state.score = 0;
   state.combo = 0;
@@ -179,6 +234,7 @@ function resetState(level = chosenLevel) {
   state.gateTimer = 0;
   state.boss = null;
   state.bossAttackTimer = 0;
+  state.bossMinionCursor = 0;
   state.ended = false;
   state.won = false;
 
@@ -551,33 +607,38 @@ function createUpgradeTarget() {
 }
 
 function spawnEnemyCluster() {
-  const clusterSize = 6 + Math.floor(Math.random() * (2 + Math.round(profile.danger * 2)));
-  const baseZ = -18 - Math.random() * 6;
-  const laneOrder = [0, 1, 2];
+  const encounterScript = levelScript?.encounters[state.encounter - 1];
+  const clusterScript = encounterScript?.clusters[state.clusterCount];
+  if (!clusterScript) {
+    state.clusterCount = state.clustersPerEncounter;
+    return;
+  }
 
-  for (let i = 0; i < clusterSize; i += 1) {
+  const laneOrder = [0, 1, 2].map((_, index) => (index + clusterScript.laneOffset) % laneXs.length);
+
+  for (let i = 0; i < clusterScript.clusterSize; i += 1) {
     const enemy = createEnemy("trooper", profile.enemyHp);
     enemy.lane = laneOrder[i % laneOrder.length];
-    enemy.z = baseZ - Math.floor(i / laneOrder.length) * (3 + Math.random() * 0.8);
-    enemy.speed = profile.enemySpeed * (0.94 + Math.random() * 0.12);
+    enemy.z = clusterScript.baseZ - Math.floor(i / laneOrder.length) * clusterScript.rowSpacing;
+    enemy.speed = profile.enemySpeed * (0.96 + (i % laneOrder.length) * 0.04);
     enemy.mesh.position.set(laneXs[enemy.lane], 0, enemy.z);
     scene.add(enemy.mesh);
     sceneObjects.enemies.push(enemy);
   }
 
-  if (Math.random() < profile.upgradeTargetChance) {
+  if (clusterScript.includeUpgrade) {
     const target = createUpgradeTarget();
-    target.lane = (Math.floor(Math.random() * laneXs.length) + 1) % laneXs.length;
-    target.z = baseZ - 2.5 - Math.random() * 2;
+    target.lane = clusterScript.upgradeLane;
+    target.z = clusterScript.baseZ - clusterScript.upgradeOffset;
     target.mesh.position.set(laneXs[target.lane], 0, target.z);
     scene.add(target.mesh);
     sceneObjects.upgradeTargets.push(target);
   }
 
-  if (Math.random() < profile.bonusBubbleChance) {
+  if (clusterScript.includeBubble) {
     const bubble = createBonusBubble();
-    bubble.lane = Math.floor(Math.random() * laneXs.length);
-    bubble.z = baseZ + 2.2;
+    bubble.lane = clusterScript.bubbleLane;
+    bubble.z = clusterScript.baseZ + clusterScript.bubbleOffset;
     bubble.mesh.position.set(laneXs[bubble.lane], 2.3, bubble.z);
     scene.add(bubble.mesh);
     sceneObjects.pickups.push(bubble);
@@ -768,7 +829,9 @@ function updateCombat(dt) {
 
   if (state.clusterTimer <= 0 && state.clusterCount < state.clustersPerEncounter) {
     spawnEnemyCluster();
-    state.clusterTimer = profile.clusterInterval * (0.85 + Math.random() * 0.4);
+    const encounterScript = levelScript?.encounters[state.encounter - 1];
+    const nextCluster = encounterScript?.clusters[state.clusterCount];
+    state.clusterTimer = nextCluster?.delay ?? profile.clusterInterval;
   }
 
   if (state.fireTimer <= 0) {
@@ -869,7 +932,8 @@ function updateBoss(dt) {
   state.bossAttackTimer -= dt;
   if (state.bossAttackTimer <= 0) {
     const minion = createEnemy("trooper", Math.max(3, Math.round(profile.enemyHp * 0.8)));
-    minion.lane = Math.floor(Math.random() * laneXs.length);
+    minion.lane = levelScript?.bossMinionLanes[state.bossMinionCursor % levelScript.bossMinionLanes.length] ?? 1;
+    state.bossMinionCursor += 1;
     minion.z = boss.z + 4;
     minion.mesh.position.set(laneXs[minion.lane], 0, minion.z);
     minion.speed = profile.enemySpeed * 1.18;
