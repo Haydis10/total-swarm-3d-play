@@ -107,7 +107,7 @@ function getLevelProfile(level) {
   return {
     danger,
     startingUnits: 1,
-    startingFireRate: 1.55 + (1 - danger) * 0.18,
+    startingFireRate: (1.55 + (1 - danger) * 0.18) * 1.3,
     encountersPerLevel: 2 + Math.floor(danger * 3),
     combatDuration: Math.max(12, 22 - danger * 7),
     clusterInterval: Math.max(0.55, 1.15 - danger * 0.35),
@@ -166,23 +166,25 @@ function buildLevelScript(level, currentProfile) {
   for (let encounterIndex = 0; encounterIndex < currentProfile.encountersPerLevel; encounterIndex += 1) {
     const clusters = [];
     for (let clusterIndex = 0; clusterIndex < currentProfile.clustersPerEncounter; clusterIndex += 1) {
-      const clusterSize = 6 + Math.floor(rng() * (2 + Math.round(currentProfile.danger * 2)));
+      const clusterSize = 3 + Math.floor(rng() * (2 + Math.round(currentProfile.danger * 1.5)));
       const baseZ = -18 - rng() * 6;
-      const laneOffset = Math.floor(rng() * laneXs.length);
-      const rowSpacing = 3 + rng() * 0.8;
+      const side = rng() > 0.5 ? "left" : "right";
+      const enemyLanes = side === "left" ? [0, 1] : [1, 2];
+      const upgradeLane = side === "left" ? 2 : 0;
+      const bubbleLane = upgradeLane;
+      const rowSpacing = 3.2 + rng() * 0.6;
       const delay = currentProfile.clusterInterval * (0.9 + rng() * 0.22);
-      const upgradeLane = (laneOffset + 1 + Math.floor(rng() * 2)) % laneXs.length;
-      const bubbleLane = Math.floor(rng() * laneXs.length);
 
       clusters.push({
         clusterSize,
         baseZ,
-        laneOffset,
+        side,
+        enemyLanes,
         rowSpacing,
         delay,
         includeUpgrade: true,
         upgradeLane,
-        upgradeOffset: 2.5 + rng() * 2,
+        upgradeOffset: 1.8 + rng() * 1.2,
         includeBubble: rng() < currentProfile.bonusBubbleChance,
         bubbleLane,
         bubbleOffset: 2.2,
@@ -614,7 +616,7 @@ function spawnEnemyCluster() {
     return;
   }
 
-  const laneOrder = [0, 1, 2].map((_, index) => (index + clusterScript.laneOffset) % laneXs.length);
+  const laneOrder = clusterScript.enemyLanes;
 
   for (let i = 0; i < clusterScript.clusterSize; i += 1) {
     const enemy = createEnemy("trooper", profile.enemyHp);
